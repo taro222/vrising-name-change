@@ -1,43 +1,42 @@
 import sys
 
-def modify_hex_file(filename, old_name, new_name):
+def find_and_replace(filename, old_name, new_name):
     with open(filename, 'rb') as file:
-        hex_data = file.read()
+        data = file.read()
 
-    #Convert Names into HEX
-    old_name_hex = old_name.encode()
-    new_name_hex = new_name.encode()
+    old_name_bytes = old_name.encode()
+    new_name_bytes = new_name.encode()
+    name_length_bytes = len(new_name_bytes).to_bytes(2, byteorder='little')
 
-    #lf old name
-    if old_name_hex in hex_data:
-        if len(new_name) > 20:
-            print("Only up to 20 characters are allowed")
-            return
+    occurrences = data.count(old_name_bytes)
+    replaced_count = 0
 
-        #replace name in hex
-        hex_data = hex_data.replace(old_name_hex, new_name_hex)
-        
-        #length difference and fillers
-        old_len = len(old_name)
-        new_len = len(new_name)
-        if old_len < new_len:
-            hex_data = hex_data.replace(b'\x00' * (new_len - old_len), b'')
-        elif old_len > new_len:
-            hex_data = hex_data.replace(new_name_hex, new_name_hex + b'\x00' * (old_len - new_len))
+    if new_name_bytes not in data:
+        while occurrences > 0:
+            index = data.index(old_name_bytes)
+            length_index = index - 2
+
+            name_length = int.from_bytes(data[length_index:length_index+2], byteorder='little')
+
+            if name_length == len(old_name_bytes) and len(new_name_bytes) <= 20:
+                data = data[:index] + new_name_bytes + data[index + len(old_name_bytes):]
+                data = data[:length_index] + name_length_bytes + data[length_index + 2:]
+                replaced_count += 1
+
+            occurrences -= 1
 
         with open(filename, 'wb') as file:
-            file.write(hex_data)
+            file.write(data)
 
-        print("Name is updated")
+        print(f'The name was successfully changed in {replaced_count} entries.')
     else:
-        print("Old Name not found")
+        print('The new name is already present in the file. Please choose a different name.')
 
-#python converter.py filename.save Liv Mario
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print("Wrong arguments. python converter.py filename.save old_name new_name")
+    if len(sys.argv) < 4:
+        print('Please provide the filename, old name, and new name as arguments.')
     else:
         filename = sys.argv[1]
         old_name = sys.argv[2]
         new_name = sys.argv[3]
-        modify_hex_file(filename, old_name, new_name)
+        find_and_replace(filename, old_name, new_name)
